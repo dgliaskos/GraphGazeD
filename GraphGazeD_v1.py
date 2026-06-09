@@ -1,5 +1,5 @@
 #     GraphGazeD tool
-#     Copyright (C) 2024 Dimitrios Liaskos (University of West Attica)
+#     Copyright (C) 2026 Dimitrios Liaskos (University of West Attica)
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -93,7 +93,6 @@ def dif_calc(dir_path, output_csv_file):
     print("Job done!")
 
 
-# call function
 # dif_calc('heatmaps', 'dif_calc.csv')
 
 ##----------------------------------------------------------------------------##
@@ -122,7 +121,7 @@ def dif_plot(file_path, output_folder):
 
     # Plot the data in chunks of 256 values
     for i in range(len(titles_chunks)):
-        start_index = i * 256 # Calculate start index
+        start_index = i * 256  # Calculate start index
         end_index = min((i + 1) * 256, len(data))  # Calculate end index
 
         plt.plot(x[start_index:end_index], data[start_index:end_index], color='blue')  # Plot chunk
@@ -143,11 +142,10 @@ def dif_plot(file_path, output_folder):
         # Save the plot
         plt.savefig(output_filename)
         plt.close()  # Close the plot to release memory
-        
 
     print("Plots generated successfully!")
 
-# call function
+
 # dif_plot('dif_calc.csv', 'plots')
 
 ##----------------------------------------------------------------------------##
@@ -162,12 +160,12 @@ def curve_fitting(file_path, output_folder):
         return a * x**6 + b * x**5 + c * x**4 + d * x**3 + e * x**2 + f * x + g
     
     # rectangular hyperbola
-    #def function(x, a, b, c):
-        #return a * x / (b + x) + c
+    # def function(x, a, b, c):
+    #     return a * x / (b + x) + c
 
     # logistic function (sigmoid)
-    #def function(x, a, b, c):
-        #return a / (1 + np.exp(-b * (x - c)))
+    # def function(x, a, b, c):
+    #     return a / (1 + np.exp(-b * (x - c)))
     
     data = []
     x = []
@@ -190,7 +188,7 @@ def curve_fitting(file_path, output_folder):
 
     # Plot the data in chunks of 256 values
     for i in range(len(titles_chunks)):
-        start_index = i * 256 # Calculate start index
+        start_index = i * 256  # Calculate start index
         end_index = min((i + 1) * 256, len(data))  # Calculate end index
 
         plt.plot(x[start_index:end_index], data[start_index:end_index], color='blue')  # Plot chunk
@@ -229,5 +227,5 @@ def curve_fitting(file_path, output_folder):
 
     print("Plots with fitted curves generated successfully!")
 
-# call function
+
 # curve_fitting('dif_calc.csv', 'curve_fitting_6_degree_polynomial')
