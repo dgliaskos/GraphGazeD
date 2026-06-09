@@ -304,7 +304,7 @@ def _fit_logistic(x, y, title, output_folder):
 if __name__ == "__main__":
     
     print("="*80)
-    print("GraphGazeD Tool - Complete Pipeline")
+    print("GraphGazeD")
     print("="*80 + "\n")
     
     heatmap_dir = 'heatmaps'
@@ -329,8 +329,8 @@ if __name__ == "__main__":
     print("Step 3: Fit curves to data")
     print("-" * 80)
     print("Choose model type:")
-    print("  'poly'     - 6th degree polynomial (7 parameters, more flexible)")
-    print("  'logistic' - Logistic/sigmoid function (3 parameters, S-shaped)")
+    print("  'poly'     - 6th degree polynomial (7 parameters)")
+    print("  'logistic' - Logistic/sigmoid function (3 parameters)")
     print()
     
     model_choice = input("Enter model type (poly or logistic): ").strip().lower()
