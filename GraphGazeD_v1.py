@@ -1,4 +1,4 @@
-#     GraphGazeD tool
+#     GraphGazeD
 #     Copyright (C) 2026 Dimitrios Liaskos (University of West Attica)
 #
 #     This program is free software: you can redistribute it and/or modify
@@ -23,209 +23,323 @@ import csv
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
+import warnings
 
-##----------------------------------------------------------------------------##
-## DIFFERENCE CALCULATION FUNCTION
-##----------------------------------------------------------------------------##
+warnings.filterwarnings('ignore')
+
+##============================================================================##
+## MATHEMATICAL MODEL DEFINITIONS
+##============================================================================##
+
+def poly_6(x, a, b, c, d, e, f, g):
+    return a * x**6 + b * x**5 + c * x**4 + d * x**3 + e * x**2 + f * x + g
+
+
+def logistic(x, a, b, c):
+    x_safe = np.clip(b * (x - c), -500, 500)
+    return a / (1 + np.exp(-x_safe))
+
+##============================================================================##
+## STEP 1: DIFFERENCE CALCULATION
+##============================================================================##
 
 def dif_calc(dir_path, output_csv_file):
-    # Get the list of image files
+    
+    print("Starting difference calculation...")
+    
     files = [file for file in os.listdir(dir_path) if file.endswith('.png')]
+    
+    if not files:
+        print(f"ERROR: No PNG files found in '{dir_path}'")
+        return
+    
+    print(f"Found {len(files)} image files")
 
-    # Open the CSV file in write mode
-    with open(output_csv_file, 'w') as csv_file:
-        # Create a CSV writer object
+    with open(output_csv_file, 'w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-
-        # Write the header row to the CSV file
         csv_writer.writerow(["Pair", "Difference", "Threshold"])
 
-        # Dictionary to store pairs and corresponding image files
         files_dict = {}
-
-        # Iterate over image files
+        
         for file in files:
-            # Split the file name
             parts = file.split('_')
-
-            # Extract the name and source
             name = parts[0]
             source = parts[-1].split('.')[0]
-
-            # Append the file to the corresponding name-source pair in the dictionary
             pair_key = f"{name}_{source}"
+            
             if pair_key in files_dict:
                 files_dict[pair_key].append(file)
             else:
                 files_dict[pair_key] = [file]
 
-        # Iterate over unique name-source pairs
+        pair_count = 0
+        
         for pair_key, files_source in files_dict.items():
-            # Iterate over images in the set
             for i in range(0, min(5, len(files_source))):
                 for j in range(i + 1, min(i + 5, len(files_source))):
-                    # Read images
-                    image1 = cv2.imread(os.path.join(dir_path, files_source[i]), 0).astype("int8")
-                    image2 = cv2.imread(os.path.join(dir_path, files_source[j]), 0).astype("int8")
+                    
+                    img_path_1 = os.path.join(dir_path, files_source[i])
+                    img_path_2 = os.path.join(dir_path, files_source[j])
+                    
+                    image1 = cv2.imread(img_path_1, 0).astype("float64")
+                    image2 = cv2.imread(img_path_2, 0).astype("float64")
 
-                    # Pair name
+                    if image1 is None or image2 is None:
+                        print(f"  WARNING: Failed to load {files_source[i]} or {files_source[j]}")
+                        continue
+
                     pair_name = f"{files_source[i].split('.')[0]} - {files_source[j].split('.')[0]}"
 
-                    # Iterate over all threshold values from 0 to 1
+                    diff = image1 - image2
+                    value = np.absolute(diff)
+                    total_pixels = value.shape[0] * value.shape[1]
+
                     for threshold in np.linspace(0, 1, num=256):
-                        # Calculate difference
-                        diff = image1 - image2
+                        threshold_value = threshold * 255
+                        counter = np.sum(value <= threshold_value)
+                        heat_dif = (counter / total_pixels) * 100
 
-                        # Turn difference to table
-                        value = np.absolute(diff)
-
-                        # Accumulate counter for all pixels
-                        counter = 0
-                        for ii in range(value.shape[0]):
-                            for jj in range(value.shape[1]):
-                                if value[ii,jj] <= threshold * 255:
-                                    counter = counter + 1
-                                    heat_dif = (counter/((ii+1) * (jj+1)))
-
-                        # Write the data to the CSV file
                         csv_writer.writerow([pair_name, heat_dif, threshold])
+                    
+                    pair_count += 1
+                    print(f"  Processed pair {pair_count}: {pair_name}")
 
-    print("Job done!")
+    print(f"Difference calculation complete!")
+    print(f"Results saved to: {output_csv_file}\n")
 
+##============================================================================##
+## STEP 2: DIFFERENCE PLOTTING
+##============================================================================##
 
-# dif_calc('heatmaps', 'dif_calc.csv')
-
-##----------------------------------------------------------------------------##
-## DIFFERENCE PLOT FUNCTION
-##----------------------------------------------------------------------------##
-    
 def dif_plot(file_path, output_folder):
+    
+    print("Generating difference plots...")
+    
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+        print(f"Created output folder: {output_folder}")
+
     data = []
     x = []
-    titles = []  # Store titles
+    titles = []
 
-    # Open the CSV file
     with open(file_path, 'r') as f:
         csvreader = csv.reader(f)
-        next(csvreader)  # Skip the header row
+        next(csvreader)
 
         for row in csvreader:
             if len(row) >= 3:
-                # Extract the last two columns (assuming they are the last two columns)
-                data.append(float(row[-2]))  # Append second-to-last column value as float to 'data' list
-                x.append(float(row[-1]))     # Append last column value as float to 'x' list
-                titles.append(row[0])        # Append title from the first column
+                data.append(float(row[-2]))
+                x.append(float(row[-1]))
+                titles.append(row[0])
     
-    # Split titles into chunks of 256 rows
+    print(f"Read {len(data)} data points")
+
     titles_chunks = [titles[i:i+256] for i in range(0, len(titles), 256)]
+    plot_count = 0
 
-    # Plot the data in chunks of 256 values
     for i in range(len(titles_chunks)):
-        start_index = i * 256  # Calculate start index
-        end_index = min((i + 1) * 256, len(data))  # Calculate end index
+        start_index = i * 256
+        end_index = min((i + 1) * 256, len(data))
 
-        plt.plot(x[start_index:end_index], data[start_index:end_index], color='blue')  # Plot chunk
+        plt.figure(figsize=(11, 7))
+        plt.plot(x[start_index:end_index], data[start_index:end_index], 
+                color='blue', linewidth=2.5, label='Difference Profile')
 
         plt.xlabel('Threshold', fontsize=13)
-        plt.ylabel('Heatmap Difference', fontsize=13)
-        plt.title(titles_chunks[i][0])  # Use the corresponding title for the plot
+        plt.ylabel('Heatmap Difference (%)', fontsize=13)
+        plt.title(titles_chunks[i][0], fontsize=14, fontweight='bold')
 
-        yticks = np.linspace(0, 1, 11)
-        yticks_rounded = [round(y, 1) for y in yticks]
-        plt.yticks(yticks, yticks_rounded)
+        yticks = np.linspace(0, 100, 11)
+        plt.yticks(yticks, fontsize=11)
+        plt.xticks(fontsize=11)
 
-        # Set axis limits
-        plt.xlim(0, max(x))
-        plt.ylim(0, max(data))
+        plt.xlim(0, 1)
+        plt.ylim(0, 100)
+        plt.grid(True, alpha=0.4, linestyle='--')
+        plt.legend(fontsize=11, loc='best')
+        plt.tight_layout()
 
-        output_filename = os.path.join(output_folder, f'{titles_chunks[i][0]}')
-        # Save the plot
-        plt.savefig(output_filename)
-        plt.close()  # Close the plot to release memory
+        output_filename = os.path.join(output_folder, f'{titles_chunks[i][0]}.png')
+        plt.savefig(output_filename, dpi=100, bbox_inches='tight')
+        plt.close()
+        
+        plot_count += 1
 
-    print("Plots generated successfully!")
+    print(f"Generated {plot_count} plots")
+    print(f"Plots saved to: {output_folder}\n")
 
+##============================================================================##
+## STEP 3: CURVE FITTING (POLYNOMIAL OR LOGISTIC)
+##============================================================================##
 
-# dif_plot('dif_calc.csv', 'plots')
-
-##----------------------------------------------------------------------------##
-## CURVE FITTING FUNCTION
-##----------------------------------------------------------------------------##
-
-def curve_fitting(file_path, output_folder):
-    # Define the function to fit
+def curve_fitting(file_path, output_folder, model_type='poly'):
     
-    # 6th degree polynomial function
-    def function(x, a, b, c, d, e, f, g):
-        return a * x**6 + b * x**5 + c * x**4 + d * x**3 + e * x**2 + f * x + g
+    if model_type not in ['poly', 'logistic']:
+        raise ValueError(f"model_type must be 'poly' or 'logistic', got '{model_type}'")
     
-    # rectangular hyperbola
-    # def function(x, a, b, c):
-    #     return a * x / (b + x) + c
+    print(f"Starting curve fitting with {model_type} model...")
+    
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+        print(f"Created output folder: {output_folder}")
 
-    # logistic function (sigmoid)
-    # def function(x, a, b, c):
-    #     return a / (1 + np.exp(-b * (x - c)))
-    
     data = []
     x = []
-    titles = []  # Store titles
+    titles = []
 
-    # Open the CSV file
     with open(file_path, 'r') as f:
         csvreader = csv.reader(f)
-        next(csvreader)  # Skip the header row
+        next(csvreader)
 
         for row in csvreader:
             if len(row) >= 3:
-                # Extract the last two columns (assuming they are the last two columns)
-                data.append(float(row[-2]))  # Append second-to-last column value as float to 'data' list
-                x.append(float(row[-1]))     # Append last column value as float to 'x' list
-                titles.append(row[0])        # Append title from the first column
+                data.append(float(row[-2]))
+                x.append(float(row[-1]))
+                titles.append(row[0])
 
-    # Split titles into chunks of 256 rows
+    x_array = np.array(x)
+    data_array = np.array(data)
+
     titles_chunks = [titles[i:i+256] for i in range(0, len(titles), 256)]
+    plot_count = 0
 
-    # Plot the data in chunks of 256 values
     for i in range(len(titles_chunks)):
-        start_index = i * 256  # Calculate start index
-        end_index = min((i + 1) * 256, len(data))  # Calculate end index
+        start_index = i * 256
+        end_index = min((i + 1) * 256, len(data))
 
-        plt.plot(x[start_index:end_index], data[start_index:end_index], color='blue')  # Plot chunk
+        x_chunk = x_array[start_index:end_index]
+        y_chunk = data_array[start_index:end_index]
+        pair_name = titles_chunks[i][0]
 
-        # Perform the curve fitting
-        popt, pcov = curve_fit(function, x[start_index:end_index], data[start_index:end_index])
+        if model_type == 'poly':
+            _fit_polynomial(x_chunk, y_chunk, pair_name, output_folder)
+        else:  # logistic
+            _fit_logistic(x_chunk, y_chunk, pair_name, output_folder)
 
-        # Generate the fitted curve using the optimized parameters
-        fitted_curve = function(np.array(x[start_index:end_index]), *popt)
+        plot_count += 1
 
-        # Calculate R^2 value
-        r_squared = r2_score(data[start_index:end_index], fitted_curve)
-
-        # Plot the fitted curve
-        plt.plot(x[start_index:end_index], fitted_curve, 'r-', label=f'Fitted curve (R²={r_squared:.2f})')
-
-        plt.xlabel('Threshold', fontsize=13)
-        plt.ylabel('Heatmap Difference', fontsize=13)
-        plt.title(titles_chunks[i][0])
-
-        plt.legend()
-        plt.grid(True)
-
-        # Set axis limits
-        plt.xlim(0, max(x))
-        plt.ylim(0, max(data))
-
-        # Increase font size of axis numbers
-        plt.xticks(fontsize=13)
-        plt.yticks(fontsize=13)
-
-        output_filename = os.path.join(output_folder, f'{titles_chunks[i][0]}')
-        # Save the plot
-        plt.savefig(output_filename)
-        plt.close()  # Close the plot to release memory
-
-    print("Plots with fitted curves generated successfully!")
+    print(f"Generated {plot_count} plots")
+    print(f"Plots saved to: {output_folder}\n")
 
 
-# curve_fitting('dif_calc.csv', 'curve_fitting_6_degree_polynomial')
+def _fit_polynomial(x, y, title, output_folder):
+    """Fit 6th degree polynomial and generate plot"""
+    
+    model_label = 'Polynomial (6th degree)'
+    
+    plt.figure(figsize=(11, 7))
+    plt.plot(x, y, 'b-', linewidth=2.5, label='Actual Data', marker='o', 
+            markersize=3, markerfacecolor='lightblue', markeredgecolor='blue')
+
+    try:
+        popt, _ = curve_fit(poly_6, x, y, maxfev=5000)
+        fitted_curve = poly_6(x, *popt)
+        r_squared = r2_score(y, fitted_curve)
+
+        plt.plot(x, fitted_curve, 'r-', linewidth=3, 
+                label=f'{model_label} (R²={r_squared:.4f})')
+
+    except Exception as e:
+        print(f"  WARNING: Polynomial fitting failed for '{title}': {e}")
+        plt.plot(x, y, 'r-', linewidth=2.5, label='Fit failed')
+
+    plt.xlabel('Threshold', fontsize=13)
+    plt.ylabel('Heatmap Difference (%)', fontsize=13)
+    plt.title(title, fontsize=14, fontweight='bold')
+    plt.xlim(0, 1)
+    plt.ylim(0, 100)
+    plt.grid(True, alpha=0.4, linestyle='--')
+    plt.legend(fontsize=11, loc='best')
+    plt.xticks(fontsize=11)
+    plt.yticks(fontsize=11)
+    plt.tight_layout()
+
+    output_filename = os.path.join(output_folder, f'{title}.png')
+    plt.savefig(output_filename, dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def _fit_logistic(x, y, title, output_folder):
+    """Fit logistic/sigmoid function and generate plot"""
+    
+    model_label = 'Logistic (Sigmoid)'
+    
+    plt.figure(figsize=(11, 7))
+    plt.plot(x, y, 'b-', linewidth=2.5, label='Actual Data', marker='o',
+            markersize=3, markerfacecolor='lightblue', markeredgecolor='blue')
+
+    try:
+        popt, _ = curve_fit(logistic, x, y, p0=[100, 5, 0.5], maxfev=5000)
+        fitted_curve = logistic(x, *popt)
+        r_squared = r2_score(y, fitted_curve)
+
+        plt.plot(x, fitted_curve, 'r-', linewidth=3,
+                label=f'{model_label} (R²={r_squared:.4f})')
+
+    except Exception as e:
+        print(f"  WARNING: Logistic fitting failed for '{title}': {e}")
+        plt.plot(x, y, 'r-', linewidth=2.5, label='Fit failed')
+
+    plt.xlabel('Threshold', fontsize=13)
+    plt.ylabel('Heatmap Difference (%)', fontsize=13)
+    plt.title(title, fontsize=14, fontweight='bold')
+    plt.xlim(0, 1)
+    plt.ylim(0, 100)
+    plt.grid(True, alpha=0.4, linestyle='--')
+    plt.legend(fontsize=11, loc='best')
+    plt.xticks(fontsize=11)
+    plt.yticks(fontsize=11)
+    plt.tight_layout()
+
+    output_filename = os.path.join(output_folder, f'{title}.png')
+    plt.savefig(output_filename, dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+##============================================================================##
+## MAIN EXECUTION
+##============================================================================##
+
+if __name__ == "__main__":
+    
+    print("="*80)
+    print("GraphGazeD Tool - Complete Pipeline")
+    print("="*80 + "\n")
+    
+    heatmap_dir = 'heatmaps'
+    csv_output = 'dif_calc.csv'
+    plots_dir = 'plots'
+    fitting_dir = 'curve_fitting_results'
+    
+    print("Configuration:")
+    print(f"  Input directory: {heatmap_dir}")
+    print(f"  CSV output: {csv_output}")
+    print(f"  Plots directory: {plots_dir}")
+    print(f"  Fitting directory: {fitting_dir}\n")
+    
+    print("Step 1: Calculate differences")
+    print("-" * 80)
+    dif_calc(heatmap_dir, csv_output)
+    
+    print("Step 2: Generate difference plots")
+    print("-" * 80)
+    dif_plot(csv_output, plots_dir)
+    
+    print("Step 3: Fit curves to data")
+    print("-" * 80)
+    print("Choose model type:")
+    print("  'poly'     - 6th degree polynomial (7 parameters, more flexible)")
+    print("  'logistic' - Logistic/sigmoid function (3 parameters, S-shaped)")
+    print()
+    
+    model_choice = input("Enter model type (poly or logistic): ").strip().lower()
+    
+    if model_choice not in ['poly', 'logistic']:
+        print(f"Error: Invalid choice '{model_choice}'. Must be 'poly' or 'logistic'")
+    else:
+        curve_fitting(csv_output, fitting_dir, model_type=model_choice)
+    
+    print("="*80)
+    print("Pipeline complete!")
+    print("="*80)
