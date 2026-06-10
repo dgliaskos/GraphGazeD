@@ -97,7 +97,7 @@ def dif_calc(dir_path, output_csv_file):
                     for threshold in np.linspace(0, 1, num=256):
                         threshold_value = threshold * 255
                         counter = np.sum(value <= threshold_value)
-                        heat_dif = (counter / total_pixels) * 100
+                        heat_dif = counter / total_pixels
 
                         csv_writer.writerow([pair_name, heat_dif, threshold])
                     
