@@ -144,10 +144,10 @@ def dif_plot(file_path, output_folder):
 
         plt.figure(figsize=(11, 7))
         plt.plot(x[start_index:end_index], data[start_index:end_index], 
-                color='blue', linewidth=2.5, label='Difference Profile')
+                color='blue', linewidth=2.5, label='GraphGazeD')
 
         plt.xlabel('Threshold', fontsize=13)
-        plt.ylabel('Heatmap Difference (%)', fontsize=13)
+        plt.ylabel('Heatmap Difference', fontsize=13)
         plt.title(titles_chunks[i][0], fontsize=14, fontweight='bold')
 
         yticks = np.linspace(0, 100, 11)
