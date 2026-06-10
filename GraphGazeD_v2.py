@@ -34,7 +34,7 @@ warnings.filterwarnings('ignore')
 def poly_6(x, a, b, c, d, e, f, g):
     return a * x**6 + b * x**5 + c * x**4 + d * x**3 + e * x**2 + f * x + g
 
-
+    
 def logistic(x, a, b, c):
     x_safe = np.clip(b * (x - c), -500, 500)
     return a / (1 + np.exp(-x_safe))
@@ -150,12 +150,12 @@ def dif_plot(file_path, output_folder):
         plt.ylabel('Heatmap Difference', fontsize=13)
         plt.title(titles_chunks[i][0], fontsize=14, fontweight='bold')
 
-        yticks = np.linspace(0, 100, 11)
+        yticks = np.linspace(0, 1, 11)
         plt.yticks(yticks, fontsize=11)
         plt.xticks(fontsize=11)
 
         plt.xlim(0, 1)
-        plt.ylim(0, 100)
+        plt.ylim(0, 1)
         plt.grid(True, alpha=0.4, linestyle='--')
         plt.legend(fontsize=11, loc='best')
         plt.tight_layout()
@@ -221,15 +221,14 @@ def curve_fitting(file_path, output_folder, model_type='poly'):
 
     print(f"Generated {plot_count} plots")
     print(f"Plots saved to: {output_folder}\n")
-
+    
 
 def _fit_polynomial(x, y, title, output_folder):
-    """Fit 6th degree polynomial and generate plot"""
     
     model_label = 'Polynomial (6th degree)'
     
     plt.figure(figsize=(11, 7))
-    plt.plot(x, y, 'b-', linewidth=2.5, label='Actual Data', marker='o', 
+    plt.plot(x, y, 'b-', linewidth=2.5, label='GraphGazeD', marker='o', 
             markersize=3, markerfacecolor='lightblue', markeredgecolor='blue')
 
     try:
@@ -245,10 +244,10 @@ def _fit_polynomial(x, y, title, output_folder):
         plt.plot(x, y, 'r-', linewidth=2.5, label='Fit failed')
 
     plt.xlabel('Threshold', fontsize=13)
-    plt.ylabel('Heatmap Difference (%)', fontsize=13)
+    plt.ylabel('Heatmap Difference', fontsize=13)
     plt.title(title, fontsize=14, fontweight='bold')
     plt.xlim(0, 1)
-    plt.ylim(0, 100)
+    plt.ylim(0, 1)
     plt.grid(True, alpha=0.4, linestyle='--')
     plt.legend(fontsize=11, loc='best')
     plt.xticks(fontsize=11)
@@ -282,10 +281,10 @@ def _fit_logistic(x, y, title, output_folder):
         plt.plot(x, y, 'r-', linewidth=2.5, label='Fit failed')
 
     plt.xlabel('Threshold', fontsize=13)
-    plt.ylabel('Heatmap Difference (%)', fontsize=13)
+    plt.ylabel('Heatmap Difference', fontsize=13)
     plt.title(title, fontsize=14, fontweight='bold')
     plt.xlim(0, 1)
-    plt.ylim(0, 100)
+    plt.ylim(0, 1)
     plt.grid(True, alpha=0.4, linestyle='--')
     plt.legend(fontsize=11, loc='best')
     plt.xticks(fontsize=11)
@@ -295,7 +294,6 @@ def _fit_logistic(x, y, title, output_folder):
     output_filename = os.path.join(output_folder, f'{title}.png')
     plt.savefig(output_filename, dpi=100, bbox_inches='tight')
     plt.close()
-
 
 ##============================================================================##
 ## MAIN EXECUTION
@@ -331,14 +329,20 @@ if __name__ == "__main__":
     print("Choose model type:")
     print("  'poly'     - 6th degree polynomial (7 parameters)")
     print("  'logistic' - Logistic/sigmoid function (3 parameters)")
+    print("  'both'     - Fit BOTH models (separate directories)")
     print()
     
-    model_choice = input("Enter model type (poly or logistic): ").strip().lower()
+    model_choice = input("Enter model type (poly, logistic, or both): ").strip().lower()
     
-    if model_choice not in ['poly', 'logistic']:
-        print(f"Error: Invalid choice '{model_choice}'. Must be 'poly' or 'logistic'")
-    else:
+    if model_choice == 'both':
+        print("\nFitting polynomial model...")
+        curve_fitting(csv_output, 'curve_fitting_poly', model_type='poly')
+        print("Fitting logistic model...")
+        curve_fitting(csv_output, 'curve_fitting_logistic', model_type='logistic')
+    elif model_choice in ['poly', 'logistic']:
         curve_fitting(csv_output, fitting_dir, model_type=model_choice)
+    else:
+        print(f"Error: Invalid choice '{model_choice}'. Must be 'poly', 'logistic', or 'both'")
     
     print("="*80)
     print("Pipeline complete!")
